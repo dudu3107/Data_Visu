@@ -62,6 +62,15 @@ def GetIntersect(obbTree, pSource, pTarget):
     
     return pointsInter, cellIdsInter
 
+def getObbs(objects):
+    obbs = []
+    for object in objects:
+        obb = vtkOBBTree()
+        obb.SetDataSet(object.GetOutput())
+        obb.BuildLocator()
+        obbs.append(obb)
+    return obbs
+
 def nearest_intersected_object(objects, origin, direction):
     # after, object will become objects
     for object in objects:

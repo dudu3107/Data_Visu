@@ -27,13 +27,19 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QDialog, QFileDialog
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 import sys
-import pycaster.pycaster as pycaster
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from PIL import Image, ImageQt
 
 from helperFunctions import *
+
+# TODO: Show cut objects also
+# TODO: Show generated image in another QDialog
+# TODO: Select background color in configurations tab
+# TODO: implement multiprocessing
+# TODO: Ask Benji if he found a solution to the rotation problem
+# TODO: Clean code
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -80,6 +86,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.textRotation = QtWidgets.QLineEdit("")
         rotationButton = QtWidgets.QPushButton("Rotate")
         rotationButton.setFont(QtGui.QFont('Times', 8))
+        configButton = QtWidgets.QPushButton()
+        configButton.setIcon(QtGui.QIcon('Configuration.png'))
  
 
         self.vBoxLayout.addWidget(self.pushButton)
@@ -94,8 +102,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.vBoxLayout.addWidget(QtWidgets.QLabel("Rotate Body"))
         self.vBoxLayout.addWidget(self.textRotation)
         self.vBoxLayout.addWidget(rotationButton)
-        self.vBoxLayout.addWidget(QtWidgets.QLabel())
-        self.vBoxLayout.setStretch(13, 1)
+        self.vBoxLayout.addWidget(configButton)
+        # self.vBoxLayout.addWidget(QtWidgets.QLabel())
+        # self.vBoxLayout.setStretch(13, 1)
 
 
         self.hBoxLayout = QtWidgets.QHBoxLayout()
@@ -120,6 +129,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.sliderCy.valueChanged.connect(self.moveCameray)
         self.sliderCz.valueChanged.connect(self.moveCameraz)
         rotationButton.clicked.connect(self.rotateBody)
+        configButton.clicked.connect(self.showConfigWindow)
         
         self.frame.setLayout(self.hBoxLayout)
         self.setCentralWidget(self.frame)
@@ -128,6 +138,46 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.show()
         self.iren.Initialize()
         self.iren.Start()
+    
+    def showConfigWindow(self):
+        def saveConfigs(width_text, height_text, depth_text):
+            if width_text.text() and height_text.text() and depth_text.text():
+                self.width = int(width_text.text())
+                self.height = int(height_text.text())
+                self.max_depth = int(depth_text.text())
+            else:
+                msgBox = QtWidgets.QMessageBox()
+                msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+                msgBox.setWindowTitle("Warning")
+                msgBox.setText("Be sure to fill out all the fields!")
+                msgBox.exec_()
+
+        win = QtWidgets.QDialog()
+        win.setWindowTitle("Configurations")
+        win.setWindowIcon(QtGui.QIcon('configuration.png'))
+
+        label1 = QtWidgets.QLabel("Image resolution (width/height)")
+        width_text = QtWidgets.QLineEdit(f"{self.width}")
+        height_text = QtWidgets.QLineEdit(f"{self.height}")
+        label2 = QtWidgets.QLabel("Number of reflexions")
+        depth_text = QtWidgets.QLineEdit(f"{self.max_depth}")
+
+        buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok, QtCore.Qt.Horizontal)
+
+        layout = QtWidgets.QGridLayout()
+        layout.addWidget(label1, 0, 0, 1, 2)
+        layout.addWidget(width_text, 1, 0)
+        layout.addWidget(height_text, 1, 1)
+        layout.addWidget(label2, 2, 0, 1, 2)
+        layout.addWidget(depth_text, 3, 0, 1, 2)
+        layout.addWidget(buttonBox, 4, 1)
+
+        buttonBox.accepted.connect(win.accept)
+        buttonBox.accepted.connect(lambda: saveConfigs(width_text, height_text, depth_text))
+
+        win.setLayout(layout)
+        win.exec_()
+
     
     def createRenderers(self):
         self.ren = vtkRenderer()
@@ -145,10 +195,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # self.ren2.SetViewport(0.5, 0, 1, 1)
     
     def _createCamera(self):
-        self.width = 300
-        self.height = 300
-
-        self.max_depth = 3
+        self.width = 100
+        self.height = 100
+        self.max_depth = 2
 
         self.camera = np.array([0, 1, 4])
         self.initCamera = np.array([0, 1, 4])
@@ -191,7 +240,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         bkg = map(lambda x: x / 255.0, [26, 51, 102, 255])
         self.colors.SetColor("ivory_black", *bkg)
 
-        configs = [ {"image_file": "LogoMines.jpg", "angle": 0},
+        configs = [ {"image_file": "Logo_HPC_AI.jpg", "angle": 0},
                     {"image_file": "cloud.jpg", "angle": 90},
                     {"image_file": "hand-7014643_1920.jpg", "angle": 180},
                     {"image_file": "LogoMines.jpg", "angle": 270},
@@ -414,15 +463,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 actor.RotateY(angle)
             self.vtkWidget.GetRenderWindow().Render()
 
-    def nearest_intersected_object(self, objects, origin, direction):
+    def nearest_intersected_object(self, objects, obbs, origin, direction):
         # after, object will become objects
         distances = []
         cellIds = []
-        for object in objects:
+        for obb in obbs:
             pTarget = origin + 40*direction
-            obb = vtkOBBTree()
-            obb.SetDataSet(object.GetOutput())
-            obb.BuildLocator()
             if isHit(obb, origin, pTarget): 
                 pointsInter, cellIdsInter = GetIntersect(obb, origin, pTarget)
                 #caster = pycaster.rayCaster(object)
@@ -452,10 +498,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # print(nearest_object.GetXLength(), objects[0].GetXLength(), objects[1].GetXLength(), distances)
         return nearest_object, min_distance, cellId
 
+
     def rayTrancingRender(self):
         self.bl = 0
         self.nbl = 0
-        # self.pixels = 0
+        
+        obbs = getObbs(self.objects)
+
         image = np.zeros((self.height, self.width, 3))
         for i, y in enumerate(np.linspace(self.screen[1], self.screen[3], self.height)):
             for j, x in enumerate(np.linspace(self.screen[0], self.screen[2], self.width)):
@@ -468,10 +517,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 color = np.zeros((3))
                 reflection = 1
 
-                for k in range(1): #self.max_depth
+                for k in range(self.max_depth):
                     # check for intersections
                     nearest_object, min_distance, cellId = self.nearest_intersected_object(
-                                                                self.objects, origin, direction)
+                                                                self.objects, obbs, origin, direction)
                     # self.pixels +=1 
                     if nearest_object is None:
                         # self.bl+=1
@@ -491,7 +540,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     intersection_to_light = normalize(l2n(self.sunActor.GetCenter()) - shifted_point)
                     # print(min_distance, intersection_to_light_distance)
 
-                    _, min_distance, _ = self.nearest_intersected_object(self.objects, 
+                    _, min_distance, _ = self.nearest_intersected_object(self.objects, obbs,
                                                             shifted_point, intersection_to_light)
 
                     intersection_to_light_distance = np.linalg.norm(
@@ -511,7 +560,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     actor = self.actors[index]
                     prop = actor.GetProperty()
                     shininess = 100
-                    reflection_objects = 0.5 if nearest_object == self.cubeRef else 0.1
+                    reflection_objects = 0.5 if nearest_object == self.cubeRef else 0.05
 
                     # ambiant
                     illumination += l2n(prop.GetAmbientColor()) * self.sunLight['ambient']
