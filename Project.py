@@ -32,56 +32,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from PIL import Image, ImageQt
-import time
 
-
-l2n = lambda l: np.array(l)
-n2l = lambda n: list(n)
-
-def updateFrames(depthFrame):
-   #Build vtkImageData here from the given numpy uint8_t arrays.
-   ImageData = vtkImageData()
-   depthArray = numpy_support.numpy_to_vtk(depthFrame.ravel(), deep=True, array_type=VTK_UNSIGNED_CHAR) 
-   # .transpose(2, 0, 1) may be required depending on numpy array order see - https://github.com/quentan/Test_ImageData/blob/master/TestImageData.py
-
-   ImageData.SetDimensions(depthFrame.shape)
-  #assume 0,0 origin and 1,1 spacing.
-   ImageData.SetSpacing(1, 1, 0)
-   ImageData.SetOrigin(0, 0, 0)
-   ImageData.GetPointData().SetScalars(depthArray)
-   return ImageData
-
-def normalize(vector):
-    return vector / np.linalg.norm(vector)
-
-def reflected(vector, axis):
-    return vector - 2 * np.dot(vector, axis) * axis
-
-def isHit(obbTree, pSource, pTarget):
-    r"""Returns True if the line intersects with the mesh in 'obbTree'"""
-    code = obbTree.IntersectWithLine(pSource, pTarget, None, None)
-    if code==0:
-        return False
-    return True
-    
-def GetIntersect(obbTree, pSource, pTarget):
-    points = vtkPoints()
- 
-    cellIds = vtkIdList()
-    code = obbTree.IntersectWithLine(pSource, pTarget, points, cellIds)
-    pointData = points.GetData()
-    noPoints = pointData.GetNumberOfTuples()
-    noIds = cellIds.GetNumberOfIds()
-    
-    assert (noPoints == noIds)
-    
-    pointsInter = []
-    cellIdsInter = []
-    for idx in range(noPoints):
-        pointsInter.append(pointData.GetTuple3(idx))
-        cellIdsInter.append(cellIds.GetId(idx))
-    
-    return pointsInter, cellIdsInter
+from helperFunctions import *
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -90,7 +42,8 @@ class Ui_MainWindow(object):
         self.frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame.setFrameShadow(QtWidgets.QFrame.Raised)
 
-        MainWindow.setWindowTitle('Vtk Project : Online View Window  /  Offline Raytrancing Window')
+        MainWindow.setWindowIcon(QtGui.QIcon('optics.png'))
+        MainWindow.setWindowTitle('Vtk Project : Raytracing tool')
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
 
@@ -118,6 +71,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.slidery.setValue(100)
         self.sliderz = QtWidgets.QSlider(Qt.Horizontal)
         self.sliderz.setValue(50)
+        self.sliderCx = QtWidgets.QSlider(Qt.Horizontal)
+        self.sliderCx.setValue(50)
+        self.sliderCy = QtWidgets.QSlider(Qt.Horizontal)
+        self.sliderCy.setValue(50)
+        self.sliderCz = QtWidgets.QSlider(Qt.Horizontal)
+        self.sliderCz.setValue(50)
         self.textRotation = QtWidgets.QLineEdit("")
         rotationButton = QtWidgets.QPushButton("Rotate")
         rotationButton.setFont(QtGui.QFont('Times', 8))
@@ -128,11 +87,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.vBoxLayout.addWidget(self.sliderx)
         self.vBoxLayout.addWidget(self.slidery)
         self.vBoxLayout.addWidget(self.sliderz)
+        self.vBoxLayout.addWidget(QtWidgets.QLabel("Move Camera"))
+        self.vBoxLayout.addWidget(self.sliderCx)
+        self.vBoxLayout.addWidget(self.sliderCy)
+        self.vBoxLayout.addWidget(self.sliderCz)
         self.vBoxLayout.addWidget(QtWidgets.QLabel("Rotate Body"))
         self.vBoxLayout.addWidget(self.textRotation)
         self.vBoxLayout.addWidget(rotationButton)
         self.vBoxLayout.addWidget(QtWidgets.QLabel())
-        self.vBoxLayout.setStretch(9, 1)
+        self.vBoxLayout.setStretch(13, 1)
 
 
         self.hBoxLayout = QtWidgets.QHBoxLayout()
@@ -153,6 +116,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.sliderx.valueChanged.connect(self.moveAgentx)
         self.slidery.valueChanged.connect(self.moveAgenty)
         self.sliderz.valueChanged.connect(self.moveAgentz)
+        self.sliderCx.valueChanged.connect(self.moveCamerax)
+        self.sliderCy.valueChanged.connect(self.moveCameray)
+        self.sliderCz.valueChanged.connect(self.moveCameraz)
         rotationButton.clicked.connect(self.rotateBody)
         
         self.frame.setLayout(self.hBoxLayout)
@@ -179,15 +145,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # self.ren2.SetViewport(0.5, 0, 1, 1)
     
     def _createCamera(self):
-        self.width = 30
-        self.height = 30
+        self.width = 50
+        self.height = 50
 
         self.max_depth = 3
 
-        self.camera = np.array([0, 0, 6.5])
+        self.camera = np.array([0, 1, 4])
+        self.initCamera = np.array([0, 1, 4])
         self.ratio = float(self.width) / self.height
-        screen_size = 1.5
-        self.screen = (-screen_size, screen_size / self.ratio, screen_size, -screen_size / self.ratio)
+        self.screen_size = 0.5
+        self.distScreen = 1
+        self.screen = coordsScreen(self.screen_size, self.camera, self.ratio)
         self.sunLight = {'ambient': np.array([1, 1, 1]), 'diffuse': np.array([1, 1, 1]), 
                         'specular': np.array([1, 1, 1])}
         
@@ -208,7 +176,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.screenSource.SetXLength(self.screen[2] - self.screen[0])
         self.screenSource.SetYLength(self.screen[1] - self.screen[3])
         self.screenSource.SetZLength(0.1)
-        self.screenSource.SetCenter(l2n(self.camera - (0, 0, 0.5)))
+        self.screenSource.SetCenter(l2n(self.camera - (0, 0, self.distScreen)))
         outline = vtkOutlineFilter()
         outline.SetInputConnection(self.screenSource.GetOutputPort())
         outlineMapper = vtkPolyDataMapper()
@@ -224,8 +192,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.colors.SetColor("ivory_black", *bkg)
 
         configs = [ {"image_file": "LogoMines.jpg", "angle": 0},
-                    {"image_file": "LogoMines.jpg", "angle": 90},
-                    {"image_file": "LogoMines.jpg", "angle": 180},
+                    {"image_file": "cloud.jpg", "angle": 90},
+                    {"image_file": "hand-7014643_1920.jpg", "angle": 180},
                     {"image_file": "LogoMines.jpg", "angle": 270},
         ]
 
@@ -329,18 +297,27 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         cubeRef = vtkCubeSource()
         cubeRef.SetXLength(6)
-        cubeRef.SetYLength(4)
-        cubeRef.SetZLength(6)
-        cubeRef.SetCenter((0, 1.4, 1))
+        cubeRef.SetYLength(3.4)
+        cubeRef.SetZLength(8)
+        cubeRef.SetCenter((0, 1.1, 1.5))
+        # self.objects.append(cubeRef)
 
         outline = vtkOutlineFilter()
         outline.SetInputConnection(cubeRef.GetOutputPort())
-
         outlineMapper = vtkPolyDataMapper()
         outlineMapper.SetInputConnection(outline.GetOutputPort())
-
         outlineActor = vtkActor()
         outlineActor.SetMapper(outlineMapper)
+
+        cubeRefMapper = vtkDataSetMapper()
+        cubeRefMapper.SetInputConnection(cubeRef.GetOutputPort())
+        cubeRefActor = vtkActor()
+        cubeRefActor.SetMapper(cubeRefMapper)
+        cubeRefActor.GetProperty().SetColor([0.6, 0.6, 0.6])
+        cubeRefActor.GetProperty().SetAmbientColor([0.1, 0.1, 0.1])
+        cubeRefActor.GetProperty().SetDiffuseColor([0.6, 0.6, 0.6])
+        cubeRefActor.GetProperty().SetSpecularColor([1, 1, 1])
+        # self.actors.append(cubeRefActor)
 
         self._createSunActor()
 
@@ -358,7 +335,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _createSunActor(self):
         ResolutionSun = 10
         sun = vtkSphereSource()
-        sun.SetCenter(0.0, 3.3, 1.4)
+        sun.SetCenter(0.0, 2.7, 1.4)
         sun.SetRadius(0.1)
         sun.SetThetaResolution(ResolutionSun)
         sun.SetPhiResolution(ResolutionSun)
@@ -383,22 +360,52 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def moveAgentx(self):
         for agent in [self.sunActor]:
             agent.SetPosition([(self.sliderx.value() - 50) / 18, 
-                    (self.slidery.value() - 100) / 30, (self.sliderz.value() - 50) / 18])
+                    (self.slidery.value() - 100) / 33, (self.sliderz.value() - 50) / 14])
 
         self.vtkWidget.GetRenderWindow().Render()
     
     def moveAgenty(self):
         for agent in [self.sunActor]:
             agent.SetPosition([(self.sliderx.value() - 50) / 18, 
-                    (self.slidery.value() - 100) / 30, (self.sliderz.value() - 50) / 18])
+                    (self.slidery.value() - 100) / 33, (self.sliderz.value() - 50) / 14])
 
         self.vtkWidget.GetRenderWindow().Render()
     
     def moveAgentz(self):
         for agent in [self.sunActor]:
             agent.SetPosition([(self.sliderx.value() - 50) / 18, 
-                    (self.slidery.value() - 100) / 30, (self.sliderz.value() - 50) / 18])
+                    (self.slidery.value() - 100) / 33, (self.sliderz.value() - 50) / 14])
         self.vtkWidget.GetRenderWindow().Render()
+    
+    def moveCamerax(self):
+        for agent in [self.actorCamera, self.screenActor]:
+            agent.SetPosition([(self.sliderCx.value() - 50) / 18, 
+                    (self.sliderCy.value() - 50) / 50, (self.sliderCz.value() - 50) / 50])
+
+        self.camera = self.initCamera + l2n(self.actorCamera.GetPosition())
+        self.screen = coordsScreen(self.screen_size, self.camera, self.ratio)
+        self.vtkWidget.GetRenderWindow().Render()
+    
+    def moveCameray(self):
+        for agent in [self.actorCamera, self.screenActor]:
+            agent.SetPosition([(self.sliderCx.value() - 50) / 18, 
+                    (self.sliderCy.value() - 50) / 50, (self.sliderCz.value() - 50) / 50])
+        
+        self.camera = self.initCamera + l2n(self.actorCamera.GetPosition())
+        self.screen = coordsScreen(self.screen_size, self.camera, self.ratio)
+        self.vtkWidget.GetRenderWindow().Render()
+    
+    def moveCameraz(self):
+        for agent in [self.actorCamera, self.screenActor]:
+            agent.SetPosition([(self.sliderCx.value() - 50) / 18, 
+                    (self.sliderCy.value() - 50) / 50, (self.sliderCz.value() - 50) / 50])
+        
+        # print(self.camera, self.actorCamera.GetPosition())
+        self.camera = self.initCamera + l2n(self.actorCamera.GetPosition())
+        self.screen = coordsScreen(self.screen_size, self.camera, self.ratio)
+        self.vtkWidget.GetRenderWindow().Render()
+        # print(self.camera)
+
     
     def rotateBody(self):
         if self.textRotation.text() and self.textRotation.text()!="-":
@@ -410,7 +417,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def nearest_intersected_object(self, objects, origin, direction):
         # after, object will become objects
         for object in objects:
-            pTarget = origin + 10*direction
+            pTarget = origin + 40*direction
             obb = vtkOBBTree()
             obb.SetDataSet(object.GetOutput())
             obb.BuildLocator()
@@ -425,7 +432,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 distance = np.linalg.norm(l2n(firstPoint) - origin)
                 distances.append(distance)
                 cellIds.append(cellId)
-
+                # print(firstPoint, distance, cellId)
+                # addLine(self.ren, origin, firstPoint)
         nearest_object = None
         cellId = None
         min_distance = np.inf
@@ -436,21 +444,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 cellId = cellIds[index]
         return nearest_object, min_distance, cellId
 
-    def calcNormals(self, object, cellId):
-        normalsCalc = vtkPolyDataNormals()
-        normalsCalc.SetInputConnection(object.GetOutputPort())
-        normalsCalc.ComputePointNormalsOff()
-        normalsCalc.ComputeCellNormalsOn()
-        normalsCalc.SplittingOff()
-        normalsCalc.FlipNormalsOff()
-        normalsCalc.AutoOrientNormalsOn()
-        normalsCalc.Update()
-        normalsObject = normalsCalc.GetOutput().GetCellData().GetNormals()
-        # print(normalsObject.GetNumberOfTuples(), cellId)
-        normal = l2n(normalsObject.GetTuple(cellId))
-
-        return normal
-        
     def rayTrancingRender(self):
         # self.ren2.SetBackground(self.colors.GetColor3d("alice_blue"))
         bl = 0
@@ -460,27 +453,30 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for i, y in enumerate(np.linspace(self.screen[1], self.screen[3], self.height)):
             for j, x in enumerate(np.linspace(self.screen[0], self.screen[2], self.width)):
                 # screen is on origin
-                pixel = np.array([x, y, 0])
+                pixel = np.array([x, y, self.camera[2] - self.distScreen])
                 origin = self.camera
                 direction = normalize(pixel - origin)
+                addLine(self.ren, origin, pixel, color=[0.0, 0.0, 1.0])
+                # print("Added", pixel)
+                # self.vtkWidget.GetRenderWindow().Render()
 
                 color = np.zeros((3))
                 reflection = 1
 
-                for k in range(1): #self.max_depth
+                for k in range(self.max_depth): #self.max_depth
                     # check for intersections
                     nearest_object, min_distance, cellId = self.nearest_intersected_object(
                                                                 self.objects, origin, direction)
                             
                     if nearest_object is None:
-                        # bl+=1
+                        bl+=1
                         break
-                    # else:
-                        # nbl+=1
+                    else:
+                        nbl+=1
               
                     intersection = origin + min_distance * direction
-
-                    normal_to_surface = self.calcNormals(nearest_object, cellId)
+                    # addLine(self.ren, origin, intersection, color=[0.0, 0.0, 1.0])
+                    normal_to_surface = calcNormals(nearest_object, cellId)
       
                     shifted_point = intersection + 1e-5 * normal_to_surface
                     intersection_to_light = normalize(l2n(self.sunActor.GetCenter()) - shifted_point)
@@ -529,13 +525,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                 image[i, j] = np.clip(color, 0, 1)
      
-        # print(bl)
-        # print(nbl)
+        print("black", bl)
+        print("not black", nbl)
         # print(image)
         # vtkImage = updateFrames(image)
         # image_actor = vtkImageActor()
         # image_actor.SetInputData(vtkImage)
         # self.ren2.AddActor(image_actor)
+        # print(image.max())
         image = cv2.resize(image, dsize=(320, int(320/self.ratio)), interpolation=cv2.INTER_CUBIC)
         image -= image.min()
         image /= image.max()
@@ -548,7 +545,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # labelImage = QtWidgets.QLabel()
         # self.labelImage.setPixmap(QtGui.QPixmap.fromImage(qImg))
         # self.labelImage.adjustSize()
-        plt.imsave('RayTraicing.png', image)
+        plt.imsave('RayTracing.png', image)
         # plt.imshow(image)
         # self.vtkWidget.GetRenderWindow().AddRenderer(self.ren2)
         # self.vtkWidget.GetRenderWindow().Render()
