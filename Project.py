@@ -145,8 +145,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # self.ren2.SetViewport(0.5, 0, 1, 1)
     
     def _createCamera(self):
-        self.width = 50
-        self.height = 50
+        self.width = 300
+        self.height = 300
 
         self.max_depth = 3
 
@@ -280,7 +280,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         mainCube.SetZLength(1.2)
         mainCube.SetCenter((0, 0, 0))
         self.mainCube = mainCube
-        # self.objects.append(mainCube)
+        self.objects.append(mainCube)
 
         mainCubeMapper = vtkDataSetMapper()
         mainCubeMapper.SetInputConnection(mainCube.GetOutputPort())
@@ -292,7 +292,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         mainCubeActor.GetProperty().SetSpecularColor([1, 1, 1])
         self.mainCubeActor = mainCubeActor
         self.mainActors.append(mainCubeActor)
-        # self.actors.append(mainCubeActor)
+        self.actors.append(mainCubeActor)
         # mainCubeActor.GetProperty().SetRepresentation(1)
 
         self.cubeRef = vtkCubeSource()
@@ -416,13 +416,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def nearest_intersected_object(self, objects, origin, direction):
         # after, object will become objects
+        distances = []
+        cellIds = []
         for object in objects:
             pTarget = origin + 40*direction
             obb = vtkOBBTree()
             obb.SetDataSet(object.GetOutput())
             obb.BuildLocator()
-            distances = []
-            cellIds = []
             if isHit(obb, origin, pTarget): 
                 pointsInter, cellIdsInter = GetIntersect(obb, origin, pTarget)
                 #caster = pycaster.rayCaster(object)
@@ -434,6 +434,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 cellIds.append(cellId)
                 # print(firstPoint, distance, cellId)
                 # addLine(self.ren, origin, firstPoint)
+                # print(object.GetXLength(), objects[0].GetXLength(), objects[1].GetXLength(), distances)
+            else:
+                distances.append(None)
+                cellIds.append(None)
 
         nearest_object = None
         cellId = None
@@ -444,8 +448,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 nearest_object = objects[index]
                 cellId = cellIds[index]
                 self.nbl += 1
-        # if nearest_object is None:
-        #     print()
+
+        # print(nearest_object.GetXLength(), objects[0].GetXLength(), objects[1].GetXLength(), distances)
         return nearest_object, min_distance, cellId
 
     def rayTrancingRender(self):
@@ -464,7 +468,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 color = np.zeros((3))
                 reflection = 1
 
-                for k in range(2): #self.max_depth
+                for k in range(1): #self.max_depth
                     # check for intersections
                     nearest_object, min_distance, cellId = self.nearest_intersected_object(
                                                                 self.objects, origin, direction)
@@ -483,7 +487,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     #     normal_to_surface = - normal_to_surface
                     
                     shifted_point = intersection + 1e-5 * normal_to_surface
-                    # addPoint(self.ren, shifted_point, radius=0.01, color=[0.0, 0.0, 0.0])
+                    # addPoint(self.ren, shifted_point, radius=0.03, color=[0.0, 0.0, 0.0])
                     intersection_to_light = normalize(l2n(self.sunActor.GetCenter()) - shifted_point)
                     # print(min_distance, intersection_to_light_distance)
 
