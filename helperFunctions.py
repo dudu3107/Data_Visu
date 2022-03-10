@@ -3,6 +3,7 @@ from vtkmodules.vtkCommonDataModel import vtkImageData
 
 from vtk import vtkPolyDataNormals, vtkOBBTree, vtkIdList, vtkLineSource, VTK_UNSIGNED_CHAR             
 from vtkmodules.vtkRenderingCore import vtkActor, vtkPolyDataMapper
+from vtkmodules.vtkFiltersSources import vtkSphereSource
 
 import numpy as np
 
@@ -92,18 +93,22 @@ def nearest_intersected_object(objects, origin, direction):
             cellId = cellIds[index]
     return nearest_object, min_distance, cellId
 
-def calcNormals(object, cellId):
+def calcNormals(object, cellId, direction):
     normalsCalc = vtkPolyDataNormals()
     normalsCalc.SetInputConnection(object.GetOutputPort())
     normalsCalc.ComputePointNormalsOff()
     normalsCalc.ComputeCellNormalsOn()
     normalsCalc.SplittingOff()
-    normalsCalc.FlipNormalsOff()
-    normalsCalc.AutoOrientNormalsOn()
+    # normalsCalc.FlipNormalsOff()
+    # normalsCalc.AutoOrientNormalsOn()
     normalsCalc.Update()
     normalsObject = normalsCalc.GetOutput().GetCellData().GetNormals()
     # print(normalsObject.GetNumberOfTuples(), cellId)
     normal = l2n(normalsObject.GetTuple(cellId))
+    cos = np.dot(normal, direction) / np.linalg.norm(normal) /  np.linalg.norm(direction)
+    # Problems with theta=0
+    if cos > 0:
+        normal = -normal
 
     return normal
 
@@ -120,3 +125,20 @@ def addLine(renderer, p1, p2, color=[0.0, 0.0, 1.0]):
     actor.GetProperty().SetColor(color)
 
     renderer.AddActor(actor)
+
+def addPoint(renderer, p, radius=0.01, color=[0.0, 0.0, 0.0]):
+    point = vtkSphereSource()
+    point.SetCenter(p)
+    point.SetRadius(radius)
+    point.SetPhiResolution(100)
+    point.SetThetaResolution(100)
+
+    mapper = vtkPolyDataMapper()
+    mapper.SetInputConnection(point.GetOutputPort())
+
+    actor = vtkActor()
+    actor.SetMapper(mapper)
+    actor.GetProperty().SetColor(color)
+
+    renderer.AddActor(actor)
+

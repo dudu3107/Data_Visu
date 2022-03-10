@@ -280,7 +280,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         mainCube.SetZLength(1.2)
         mainCube.SetCenter((0, 0, 0))
         self.mainCube = mainCube
-        self.objects.append(mainCube)
+        # self.objects.append(mainCube)
 
         mainCubeMapper = vtkDataSetMapper()
         mainCubeMapper.SetInputConnection(mainCube.GetOutputPort())
@@ -292,32 +292,32 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         mainCubeActor.GetProperty().SetSpecularColor([1, 1, 1])
         self.mainCubeActor = mainCubeActor
         self.mainActors.append(mainCubeActor)
-        self.actors.append(mainCubeActor)
+        # self.actors.append(mainCubeActor)
         # mainCubeActor.GetProperty().SetRepresentation(1)
 
-        cubeRef = vtkCubeSource()
-        cubeRef.SetXLength(6)
-        cubeRef.SetYLength(3.4)
-        cubeRef.SetZLength(8)
-        cubeRef.SetCenter((0, 1.1, 1.5))
-        # self.objects.append(cubeRef)
+        self.cubeRef = vtkCubeSource()
+        self.cubeRef.SetXLength(6)
+        self.cubeRef.SetYLength(3.4)
+        self.cubeRef.SetZLength(8)
+        self.cubeRef.SetCenter((0, 1.1, 1.5))
+        self.objects.append(self.cubeRef)
 
         outline = vtkOutlineFilter()
-        outline.SetInputConnection(cubeRef.GetOutputPort())
+        outline.SetInputConnection(self.cubeRef.GetOutputPort())
         outlineMapper = vtkPolyDataMapper()
         outlineMapper.SetInputConnection(outline.GetOutputPort())
         outlineActor = vtkActor()
         outlineActor.SetMapper(outlineMapper)
 
         cubeRefMapper = vtkDataSetMapper()
-        cubeRefMapper.SetInputConnection(cubeRef.GetOutputPort())
+        cubeRefMapper.SetInputConnection(self.cubeRef.GetOutputPort())
         cubeRefActor = vtkActor()
         cubeRefActor.SetMapper(cubeRefMapper)
         cubeRefActor.GetProperty().SetColor([0.6, 0.6, 0.6])
         cubeRefActor.GetProperty().SetAmbientColor([0.1, 0.1, 0.1])
         cubeRefActor.GetProperty().SetDiffuseColor([0.6, 0.6, 0.6])
         cubeRefActor.GetProperty().SetSpecularColor([1, 1, 1])
-        # self.actors.append(cubeRefActor)
+        self.actors.append(cubeRefActor)
 
         self._createSunActor()
 
@@ -434,6 +434,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 cellIds.append(cellId)
                 # print(firstPoint, distance, cellId)
                 # addLine(self.ren, origin, firstPoint)
+
         nearest_object = None
         cellId = None
         min_distance = np.inf
@@ -442,13 +443,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 min_distance = distance
                 nearest_object = objects[index]
                 cellId = cellIds[index]
+                self.nbl += 1
+        # if nearest_object is None:
+        #     print()
         return nearest_object, min_distance, cellId
 
     def rayTrancingRender(self):
-        # self.ren2.SetBackground(self.colors.GetColor3d("alice_blue"))
-        bl = 0
-        nbl = 0
-
+        self.bl = 0
+        self.nbl = 0
+        # self.pixels = 0
         image = np.zeros((self.height, self.width, 3))
         for i, y in enumerate(np.linspace(self.screen[1], self.screen[3], self.height)):
             for j, x in enumerate(np.linspace(self.screen[0], self.screen[2], self.width)):
@@ -456,52 +459,55 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 pixel = np.array([x, y, self.camera[2] - self.distScreen])
                 origin = self.camera
                 direction = normalize(pixel - origin)
-                addLine(self.ren, origin, pixel, color=[0.0, 0.0, 1.0])
-                # print("Added", pixel)
-                # self.vtkWidget.GetRenderWindow().Render()
+                # addLine(self.ren, origin, pixel, color=[0.0, 0.0, 1.0])
 
                 color = np.zeros((3))
                 reflection = 1
 
-                for k in range(self.max_depth): #self.max_depth
+                for k in range(2): #self.max_depth
                     # check for intersections
                     nearest_object, min_distance, cellId = self.nearest_intersected_object(
                                                                 self.objects, origin, direction)
-                            
+                    # self.pixels +=1 
                     if nearest_object is None:
-                        bl+=1
+                        # self.bl+=1
                         break
-                    else:
-                        nbl+=1
+                    # else:
+                    #     nbl+=1
               
                     intersection = origin + min_distance * direction
                     # addLine(self.ren, origin, intersection, color=[0.0, 0.0, 1.0])
-                    normal_to_surface = calcNormals(nearest_object, cellId)
-      
+                    normal_to_surface = calcNormals(nearest_object, cellId, direction)
+
+                    # if nearest_object == self.cubeRef:  # It's an interior surface
+                    #     normal_to_surface = - normal_to_surface
+                    
                     shifted_point = intersection + 1e-5 * normal_to_surface
+                    # addPoint(self.ren, shifted_point, radius=0.01, color=[0.0, 0.0, 0.0])
                     intersection_to_light = normalize(l2n(self.sunActor.GetCenter()) - shifted_point)
                     # print(min_distance, intersection_to_light_distance)
 
                     _, min_distance, _ = self.nearest_intersected_object(self.objects, 
                                                             shifted_point, intersection_to_light)
 
-                    intersection_to_light_distance = np.linalg.norm(l2n(self.sunActor.GetCenter()) - intersection)
+                    intersection_to_light_distance = np.linalg.norm(
+                                                l2n(self.sunActor.GetCenter()) - intersection)
                     is_shadowed = min_distance < intersection_to_light_distance
+                    # print(is_shadowed, min_distance, intersection_to_light_distance)
 
                     if is_shadowed:
-                        bl+=1
+                        self.bl+=1
                         break
-                    else:
-                        nbl+=1
+                    # else:
+                    #     nbl+=1
                     
                     illumination = np.zeros((3))
-                    ## PAY ATTENTION to nearest Object
-                    # nearestObject = self.mainCubeActor
+
                     index = self.objects.index(nearest_object)
                     actor = self.actors[index]
                     prop = actor.GetProperty()
                     shininess = 100
-                    reflection = 0.5
+                    reflection_objects = 0.5 if nearest_object == self.cubeRef else 0.1
 
                     # ambiant
                     illumination += l2n(prop.GetAmbientColor()) * self.sunLight['ambient']
@@ -518,15 +524,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                     # reflection
                     color += reflection * illumination
-                    reflection *= reflection
+                    reflection *= reflection_objects
 
                     origin = shifted_point
                     direction = reflected(direction, normal_to_surface)
 
                 image[i, j] = np.clip(color, 0, 1)
      
-        print("black", bl)
-        print("not black", nbl)
+        print("black", self.bl)
+        print("not black", self.nbl)
+        # print(self.pixels)
         # print(image)
         # vtkImage = updateFrames(image)
         # image_actor = vtkImageActor()
