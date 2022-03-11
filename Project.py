@@ -302,7 +302,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             self.ren.AddActor(clippedImageActor)
             self.ren.AddActor(boundaryActor)
-            self.mainActors.append(clippedRenActor)
+            self.mainActors.append(clippedImageActor)
             self.mainActors.append(boundaryActor)
 
         mainCube =vtkCubeSource()
