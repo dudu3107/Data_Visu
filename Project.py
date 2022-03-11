@@ -1,54 +1,45 @@
-from tkinter.ttk import Style
-from vtkmodules.vtkCommonCore import VTK_UNSIGNED_CHAR, vtkPoints
-from vtkmodules.vtkCommonDataModel import (vtkImageData, vtkCellArray, vtkPolyData, 
-                                          vtkPolyLine, vtkOctreePointLocator, vtkPlane)
-from vtkmodules.vtkFiltersGeometry import vtkImageDataGeometryFilter
-from vtkmodules.vtkIOImage import vtkPNGWriter, vtkPNGReader, vtkJPEGReader
+from vtkmodules.vtkCommonDataModel import vtkPolyData, vtkPlane
+from vtkmodules.vtkIOImage import vtkJPEGReader
 from vtkmodules.vtkCommonColor import vtkNamedColors
-from vtkmodules.vtkFiltersSources import vtkCubeSource, vtkCylinderSource, vtkSphereSource
+from vtkmodules.vtkFiltersSources import vtkCubeSource, vtkSphereSource
 from vtkmodules.vtkFiltersModeling import vtkOutlineFilter
-from vtkmodules.vtkFiltersGeneral import vtkClipDataSet
-from vtkmodules.vtkFiltersTexture import vtkTextureMapToPlane, vtkTextureMapToSphere
-from vtkmodules.vtkFiltersCore import vtkImplicitPolyDataDistance
-import vtkmodules.vtkRenderingOpenGL2
-import vtkmodules.vtkInteractionStyle
-from vtkmodules.vtkFiltersCore import vtkGlyph3D, vtkClipPolyData, vtkFeatureEdges, vtkStripper
-from vtk import (vtkInteractorStyleTrackballCamera, vtkObject, vtkLight, vtkCellCenters, vtkCellCenters,
-                vtkGlyph3D, vtkArrowSource, vtkPolyDataNormals, vtkOBBTree, vtkIdList, vtkLineSource,
-                VTK_UNSIGNED_CHAR)
+from vtkmodules.vtkFiltersTexture import vtkTextureMapToPlane
+from vtkmodules.vtkFiltersCore import vtkClipPolyData, vtkFeatureEdges, vtkStripper
+from vtk import vtkInteractorStyleTrackballCamera, vtkLight
                 
-from vtkmodules.vtkRenderingCore import (vtkActor, vtkPolyDataMapper, vtkRenderWindow, vtkDataSetMapper,
-                                        vtkRenderWindowInteractor, vtkRenderer, vtkTexture, vtkProperty,
-                                        vtkImageActor)
+from vtkmodules.vtkRenderingCore import (vtkActor, vtkPolyDataMapper, vtkDataSetMapper,
+                                        vtkRenderer, vtkTexture)
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
-from vtk.util import numpy_support
-from PyQt5.QtWidgets import QMainWindow, QApplication, QDialog, QFileDialog
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import (QMainWindow, QApplication, QDialog, QDialogButtonBox, QFrame, QSlider,
+                             QPushButton, QLineEdit, QGridLayout, QHBoxLayout, QVBoxLayout, QLabel,
+                             QMessageBox, QColorDialog)
+from PyQt5.QtGui import QIcon, QFont, QColor
+from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-from PIL import Image, ImageQt
 
 from helperFunctions import *
 
-# TODO: Show cut objects also
-# TODO: Show generated image in another QDialog
+# TODO: Assign material to objects  x
+# TODO: Show cut objects also  xx
+# TODO: Show generated image in another QDialog xx
 # TODO: Select background color in configurations tab
 # TODO: implement multiprocessing
 # TODO: Ask Benji if he found a solution to the rotation problem
-# TODO: Clean code
+# TODO: Clean code x
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.resize(1200, 550)
-        self.frame = QtWidgets.QFrame()
-        self.frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frame.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frame = QFrame()
+        self.frame.setFrameShape(QFrame.StyledPanel)
+        self.frame.setFrameShadow(QFrame.Raised)
 
-        MainWindow.setWindowIcon(QtGui.QIcon('optics.png'))
+        MainWindow.setWindowIcon(QIcon('optics.png'))
         MainWindow.setWindowTitle('Vtk Project : Raytracing tool')
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
@@ -62,64 +53,50 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.vtkWidget = QVTKRenderWindowInteractor()
         self.vtkWidget.GetRenderWindow().AddRenderer(self.ren)
-        # self.vtkWidget.GetRenderWindow().AddRenderer(self.ren2)
 
         self.iren = self.vtkWidget.GetRenderWindow().GetInteractor()
         style = vtkInteractorStyleTrackballCamera()
         self.iren.SetInteractorStyle(style)
 
-        self.vBoxLayout = QtWidgets.QVBoxLayout()
-        self.pushButton = QtWidgets.QPushButton(" Render \n raytracing")
-        self.pushButton.setFont(QtGui.QFont('Times', 12))
-        self.sliderx = QtWidgets.QSlider(Qt.Horizontal)
+        self.vBoxLayout = QVBoxLayout()
+        self.pushButton = QPushButton(" Render \n raytracing")
+        self.pushButton.setFont(QFont('Times', 12))
+        self.sliderx = QSlider(Qt.Horizontal)
         self.sliderx.setValue(50)
-        self.slidery = QtWidgets.QSlider(Qt.Horizontal)
+        self.slidery = QSlider(Qt.Horizontal)
         self.slidery.setValue(100)
-        self.sliderz = QtWidgets.QSlider(Qt.Horizontal)
+        self.sliderz = QSlider(Qt.Horizontal)
         self.sliderz.setValue(50)
-        self.sliderCx = QtWidgets.QSlider(Qt.Horizontal)
+        self.sliderCx = QSlider(Qt.Horizontal)
         self.sliderCx.setValue(50)
-        self.sliderCy = QtWidgets.QSlider(Qt.Horizontal)
+        self.sliderCy = QSlider(Qt.Horizontal)
         self.sliderCy.setValue(50)
-        self.sliderCz = QtWidgets.QSlider(Qt.Horizontal)
+        self.sliderCz = QSlider(Qt.Horizontal)
         self.sliderCz.setValue(50)
-        self.textRotation = QtWidgets.QLineEdit("")
-        rotationButton = QtWidgets.QPushButton("Rotate")
-        rotationButton.setFont(QtGui.QFont('Times', 8))
-        configButton = QtWidgets.QPushButton()
-        configButton.setIcon(QtGui.QIcon('Configuration.png'))
- 
+        self.textRotation = QLineEdit("")
+        rotationButton = QPushButton("Rotate")
+        rotationButton.setFont(QFont('Times', 8))
+        configButton = QPushButton()
+        configButton.setIcon(QIcon('Configuration.png'))
 
         self.vBoxLayout.addWidget(self.pushButton)
-        self.vBoxLayout.addWidget(QtWidgets.QLabel("Move Light"))
+        self.vBoxLayout.addWidget(QLabel("Move Light"))
         self.vBoxLayout.addWidget(self.sliderx)
         self.vBoxLayout.addWidget(self.slidery)
         self.vBoxLayout.addWidget(self.sliderz)
-        self.vBoxLayout.addWidget(QtWidgets.QLabel("Move Camera"))
+        self.vBoxLayout.addWidget(QLabel("Move Camera"))
         self.vBoxLayout.addWidget(self.sliderCx)
         self.vBoxLayout.addWidget(self.sliderCy)
         self.vBoxLayout.addWidget(self.sliderCz)
-        self.vBoxLayout.addWidget(QtWidgets.QLabel("Rotate Body"))
+        self.vBoxLayout.addWidget(QLabel("Rotate Body"))
         self.vBoxLayout.addWidget(self.textRotation)
         self.vBoxLayout.addWidget(rotationButton)
         self.vBoxLayout.addWidget(configButton)
-        # self.vBoxLayout.addWidget(QtWidgets.QLabel())
-        # self.vBoxLayout.setStretch(13, 1)
 
-
-        self.hBoxLayout = QtWidgets.QHBoxLayout()
+        self.hBoxLayout = QHBoxLayout()
         self.hBoxLayout.addWidget(self.vtkWidget)
-        # defaultImage = np.zeros((500, 500))
-        # width, height = defaultImage.shape
-        # bytesPerLine = 3 * width
-        # qImg = QtGui.QImage(defaultImage.data, width, height, bytesPerLine, QtGui.QImage.Format_RGB888)
-        # self.labelImage = QtWidgets.QLabel()
-        # self.labelImage.setPixmap(QtGui.QPixmap(qImg))
-        # self.hBoxLayout.addWidget(self.labelImage)
         self.hBoxLayout.addLayout(self.vBoxLayout)
         self.hBoxLayout.setStretch(0, 1)
-        # self.hBoxLayout.setStretch(1, 1)
-        # self.labelImage.adjustSize()
 
         self.pushButton.clicked.connect(self.rayTrancingRender)
         self.sliderx.valueChanged.connect(self.moveAgentx)
@@ -140,38 +117,49 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.iren.Start()
     
     def showConfigWindow(self):
+        def getColor():
+            color = QColorDialog.getColor()
+            if color:
+                self.backgroundColor = [c/ 255 for c in list(color.getRgb())[:3]]
+                self.ren.SetBackground(self.backgroundColor)
+                self.vtkWidget.GetRenderWindow().Render()
+
         def saveConfigs(width_text, height_text, depth_text):
             if width_text.text() and height_text.text() and depth_text.text():
                 self.width = int(width_text.text())
                 self.height = int(height_text.text())
                 self.max_depth = int(depth_text.text())
+                
             else:
-                msgBox = QtWidgets.QMessageBox()
-                msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+                msgBox = QMessageBox()
+                msgBox.setIcon(QMessageBox.Warning)
                 msgBox.setWindowTitle("Warning")
                 msgBox.setText("Be sure to fill out all the fields!")
                 msgBox.exec_()
 
-        win = QtWidgets.QDialog()
+        win = QDialog()
         win.setWindowTitle("Configurations")
-        win.setWindowIcon(QtGui.QIcon('configuration.png'))
+        win.setWindowIcon(QIcon('configuration.png'))
 
-        label1 = QtWidgets.QLabel("Image resolution (width/height)")
-        width_text = QtWidgets.QLineEdit(f"{self.width}")
-        height_text = QtWidgets.QLineEdit(f"{self.height}")
-        label2 = QtWidgets.QLabel("Number of reflexions")
-        depth_text = QtWidgets.QLineEdit(f"{self.max_depth}")
+        label1 = QLabel("Image resolution (width/height)")
+        width_text = QLineEdit(f"{self.width}")
+        height_text = QLineEdit(f"{self.height}")
+        label2 = QLabel("Number of reflexions")
+        depth_text = QLineEdit(f"{self.max_depth}")
+        colorButton = QPushButton(" Background \n  color")
 
-        buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok, QtCore.Qt.Horizontal)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok, QtCore.Qt.Horizontal)
 
-        layout = QtWidgets.QGridLayout()
+        layout = QGridLayout()
         layout.addWidget(label1, 0, 0, 1, 2)
         layout.addWidget(width_text, 1, 0)
         layout.addWidget(height_text, 1, 1)
-        layout.addWidget(label2, 2, 0, 1, 2)
-        layout.addWidget(depth_text, 3, 0, 1, 2)
+        layout.addWidget(label2, 2, 0)
+        layout.addWidget(depth_text, 3, 0)
+        layout.addWidget(colorButton, 2, 1, 2, 1)
         layout.addWidget(buttonBox, 4, 1)
 
+        colorButton.clicked.connect(getColor)
         buttonBox.accepted.connect(win.accept)
         buttonBox.accepted.connect(lambda: saveConfigs(width_text, height_text, depth_text))
 
@@ -181,18 +169,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     
     def createRenderers(self):
         self.ren = vtkRenderer()
-        # self.ren2 = vtkRenderer()
         self.mainActors = []
         self.objects = []
         self.actors = []
+        
+        bkg = map(lambda x: x / 255.0, [26, 51, 102, 255])
+        self.colors.SetColor("ivory_black", *bkg)
+        self.backgroundColor = list(self.colors.GetColor3d("ivory_black"))
+
         self._createCamera()
         self._addActors()
 
         self.ren.ResetCamera()
-        # self.ren.SetViewport(0, 0, 0.5, 1)
-        # self.ren2.ResetCamera()
         self.ren.GetActiveCamera().Zoom(0.7)
-        # self.ren2.SetViewport(0.5, 0, 1, 1)
     
     def _createCamera(self):
         self.width = 100
@@ -236,14 +225,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.ren.AddActor(self.screenActor)
 
     def _addActors(self):
-        # Set the background color.
-        bkg = map(lambda x: x / 255.0, [26, 51, 102, 255])
-        self.colors.SetColor("ivory_black", *bkg)
-
-        configs = [ {"image_file": "Logo_HPC_AI.jpg", "angle": 0},
-                    {"image_file": "cloud.jpg", "angle": 90},
-                    {"image_file": "hand-7014643_1920.jpg", "angle": 180},
-                    {"image_file": "LogoMines.jpg", "angle": 270},
+        configs = [ {"image_file": "Logo_HPC_AI.jpg", "cutPlane": [0.6, 0, 0], "angle": 0},
+                    {"image_file": "cloud.jpg", "cutPlane": [-0.6, 0, 0], "angle": 90},
+                    {"image_file": "hand-7014643_1920.jpg", "cutPlane": [0, 0, 0.6], "angle": 180},
+                    {"image_file": "LogoMines.jpg", "cutPlane": [0, 0, -0.6], "angle": 270},
         ]
 
         for config in configs:
@@ -252,45 +237,56 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             texture = vtkTexture()
             texture.SetInputConnection(reader.GetOutputPort())
 
-            plane = vtkPlane()
-            plane.SetOrigin(0.6, 0, 0)
-            plane.SetNormal(1, 0, 0)
+            cutplaneRen = vtkPlane()
+            cutplaneRen.SetOrigin(*config["cutPlane"])
+            cutplaneRen.SetNormal(*[scalar/6*10 for scalar in config["cutPlane"]])
 
-            cube = vtkCubeSource()
-            cube.SetXLength(1)
-            cube.SetYLength(1)
-            cube.SetZLength(1)
-            cube.SetCenter((0.2, 0, 0))
+            cubeRen = vtkCubeSource()
+            cubeRen.SetXLength(0.8)
+            cubeRen.SetYLength(0.8)
+            cubeRen.SetZLength(0.8)
+            cubeRen.SetCenter(*[scalar/2 for scalar in config["cutPlane"]])  
+            clipperRen = vtkClipPolyData()
+            clipperRen.SetInputConnection(cubeRen.GetOutputPort())
+            clipperRen.GenerateClippedOutputOn()
+            clipperRen.SetClipFunction(cutplaneRen)
+            clipperRen.SetValue(0)
+            clipperRen.Update()
+            self.objects.append(clipperRen)
+            clipperMapperRen = vtkPolyDataMapper()
+            clipperMapperRen.SetInputConnection(clipperRen.GetOutputPort())
+            clippedRenActor = vtkActor()
+            clippedRenActor.SetMapper(clipperMapperRen)
+            clippedRenActor.GetProperty().SetColor([0.9, 0.9, 0.9])
+            clippedRenActor.GetProperty().SetAmbientColor([0.1, 0.1, 0.1])
+            clippedRenActor.GetProperty().SetDiffuseColor([0.9, 0.9, 0.9])
+            clippedRenActor.GetProperty().SetSpecularColor([1, 1, 1])
+            self.actors.append(clippedRenActor)
 
-            map_to_plane = vtkTextureMapToPlane()
-            map_to_plane.SetInputConnection(cube.GetOutputPort())
-
-            #clipper = vtkClipDataSet()
-            clipper = vtkClipPolyData()
-            clipper.SetInputConnection(cube.GetOutputPort())
-            clipper.GenerateClippedOutputOn()
-            clipper.SetClipFunction(plane)
-            clipper.SetValue(0)
-            clipper.Update()
-            # self.objects.append(clipper)
-
-            #image_mapper = vtkDataSetMapper()
-            image_mapper = vtkPolyDataMapper()
-            image_mapper.SetInputConnection(clipper.GetOutputPort())
-
-            planeActor = vtkActor()
-            planeActor.SetMapper(image_mapper)
-            planeActor.SetTexture(texture)
-            # planeActor.DragableOn()
-            # planeActor.SetDragable(1)
-            # planeActor.GetProperty().SetColor(self.colors.GetColor3d("White"))
-            planeActor.GetProperty().SetColor([0.9, 0.9, 0.9])
-            planeActor.GetProperty().SetAmbientColor([0.1, 0.1, 0.1])
-            planeActor.GetProperty().SetDiffuseColor([0.9, 0.9, 0.9])
-            planeActor.GetProperty().SetSpecularColor([1, 1, 1])
+            cutplaneImage = vtkPlane()
+            cutplaneImage.SetOrigin(0.3, 0, 0)
+            cutplaneImage.SetNormal(1, 0, 0)
+            cubeImage = vtkCubeSource()
+            cubeImage.SetXLength(0.8)
+            cubeImage.SetYLength(0.8)
+            cubeImage.SetZLength(0.8)
+            cubeImage.SetCenter(0.3, 0, 0)
+            clipperImage = vtkClipPolyData()
+            clipperImage.SetInputConnection(cubeImage.GetOutputPort())
+            clipperImage.GenerateClippedOutputOn()
+            clipperImage.SetClipFunction(cutplaneImage)
+            clipperImage.SetValue(0)
+            clipperImage.Update()
+            mapperImage = vtkPolyDataMapper()
+            mapperImage.SetInputConnection(clipperImage.GetOutputPort())
+            clippedImageActor = vtkActor()
+            clippedImageActor.SetMapper(mapperImage)
+            clippedImageActor.SetTexture(texture)
+            clippedImageActor.GetProperty().SetColor([0.9, 0.9, 0.9])
+            clippedImageActor.RotateY(config["angle"])
 
             boundaryEdges = vtkFeatureEdges()
-            boundaryEdges.SetInputConnection(clipper.GetOutputPort())
+            boundaryEdges.SetInputConnection(clipperRen.GetOutputPort())
             boundaryEdges.BoundaryEdgesOn()
             boundaryEdges.FeatureEdgesOff()
             boundaryEdges.NonManifoldEdgesOff()
@@ -310,18 +306,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             boundaryActor = vtkActor()
             boundaryActor.SetMapper(boundaryMapper)
-            # boundaryActor.GetProperty().SetColor(self.colors.GetColor3d("White"))
 
-            planeActor.RotateY(config["angle"])
-            boundaryActor.RotateY(config["angle"])
-            # planeActor.GetProperty().SetRepresentation(1)
-            # boundaryActor.GetProperty().SetRepresentation(1)
-            self.ren.AddActor(planeActor)
+            self.ren.AddActor(clippedImageActor)
             self.ren.AddActor(boundaryActor)
-            self.mainActors.append(planeActor)
+            self.mainActors.append(clippedRenActor)
             self.mainActors.append(boundaryActor)
-            # self.actors.append(planeActor)
-            
 
         mainCube =vtkCubeSource()
         mainCube.SetXLength(1.2)
@@ -339,10 +328,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         mainCubeActor.GetProperty().SetAmbientColor([0.1, 0, 0])
         mainCubeActor.GetProperty().SetDiffuseColor([0.7, 0, 0])
         mainCubeActor.GetProperty().SetSpecularColor([1, 1, 1])
+        mainCubeActor.GetProperty().SetDiffuse(1)
+        mainCubeActor.GetProperty().SetInterpolationToPhong()
+        # mainCubeActor.GetProperty().SetRoughness(0.1)
+        # mainCubeActor.GetProperty().SetMetallic(1)
         self.mainCubeActor = mainCubeActor
         self.mainActors.append(mainCubeActor)
         self.actors.append(mainCubeActor)
-        # mainCubeActor.GetProperty().SetRepresentation(1)
 
         self.cubeRef = vtkCubeSource()
         self.cubeRef.SetXLength(6)
@@ -372,14 +364,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.ren.AddActor(outlineActor)
         self.ren.AddActor(mainCubeActor)
-        self.ren.AddActor(planeActor)
+        self.ren.AddActor(clippedImageActor)
         self.ren.AddActor(self.sunActor)
-        self.ren.SetBackground(self.colors.GetColor3d("slate_blue_medium")) # "BkgColor"
+        self.ren.SetBackground(self.backgroundColor) # "BkgColor"
 
+        #   This adds light to the scene, but I preferred not to use it.
         # self._createLight()
         # self.ren.AddLight(self.light)
-
-        # self.ren2.SetBackground(self.colors.GetColor3d("mediumseagreen"))
 
     def _createSunActor(self):
         ResolutionSun = 10
@@ -388,7 +379,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         sun.SetRadius(0.1)
         sun.SetThetaResolution(ResolutionSun)
         sun.SetPhiResolution(ResolutionSun)
-        #sun.SetStartTheta(180)  # create a half-sphere
         self.sun = sun
         mapperSun = vtkPolyDataMapper()
         mapperSun.SetInputConnection(sun.GetOutputPort())
@@ -449,11 +439,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             agent.SetPosition([(self.sliderCx.value() - 50) / 18, 
                     (self.sliderCy.value() - 50) / 50, (self.sliderCz.value() - 50) / 50])
         
-        # print(self.camera, self.actorCamera.GetPosition())
         self.camera = self.initCamera + l2n(self.actorCamera.GetPosition())
         self.screen = coordsScreen(self.screen_size, self.camera, self.ratio)
         self.vtkWidget.GetRenderWindow().Render()
-        # print(self.camera)
 
     
     def rotateBody(self):
@@ -464,23 +452,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.vtkWidget.GetRenderWindow().Render()
 
     def nearest_intersected_object(self, objects, obbs, origin, direction):
-        # after, object will become objects
         distances = []
         cellIds = []
         for obb in obbs:
             pTarget = origin + 40*direction
             if isHit(obb, origin, pTarget): 
                 pointsInter, cellIdsInter = GetIntersect(obb, origin, pTarget)
-                #caster = pycaster.rayCaster(object)
-                # pointsIntersection = caster.castRay(origin, pTarget)
                 firstPoint = pointsInter[0]
                 cellId = cellIdsInter[0]
                 distance = np.linalg.norm(l2n(firstPoint) - origin)
                 distances.append(distance)
                 cellIds.append(cellId)
-                # print(firstPoint, distance, cellId)
                 # addLine(self.ren, origin, firstPoint)
-                # print(object.GetXLength(), objects[0].GetXLength(), objects[1].GetXLength(), distances)
             else:
                 distances.append(None)
                 cellIds.append(None)
@@ -495,14 +478,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 cellId = cellIds[index]
                 self.nbl += 1
 
-        # print(nearest_object.GetXLength(), objects[0].GetXLength(), objects[1].GetXLength(), distances)
         return nearest_object, min_distance, cellId
 
 
     def rayTrancingRender(self):
         self.bl = 0
         self.nbl = 0
-        
+
         obbs = getObbs(self.objects)
 
         image = np.zeros((self.height, self.width, 3))
@@ -521,12 +503,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     # check for intersections
                     nearest_object, min_distance, cellId = self.nearest_intersected_object(
                                                                 self.objects, obbs, origin, direction)
-                    # self.pixels +=1 
                     if nearest_object is None:
-                        # self.bl+=1
                         break
-                    # else:
-                    #     nbl+=1
               
                     intersection = origin + min_distance * direction
                     # addLine(self.ren, origin, intersection, color=[0.0, 0.0, 1.0])
@@ -536,7 +514,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     #     normal_to_surface = - normal_to_surface
                     
                     shifted_point = intersection + 1e-5 * normal_to_surface
-                    # addPoint(self.ren, shifted_point, radius=0.03, color=[0.0, 0.0, 0.0])
+                    addPoint(self.ren, shifted_point, radius=0.05, color=[0.0, 0.0, 0.0])
                     intersection_to_light = normalize(l2n(self.sunActor.GetCenter()) - shifted_point)
                     # print(min_distance, intersection_to_light_distance)
 
@@ -551,8 +529,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     if is_shadowed:
                         self.bl+=1
                         break
-                    # else:
-                    #     nbl+=1
                     
                     illumination = np.zeros((3))
 
@@ -586,30 +562,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
      
         print("black", self.bl)
         print("not black", self.nbl)
-        # print(self.pixels)
-        # print(image)
-        # vtkImage = updateFrames(image)
-        # image_actor = vtkImageActor()
-        # image_actor.SetInputData(vtkImage)
-        # self.ren2.AddActor(image_actor)
-        # print(image.max())
+
         image = cv2.resize(image, dsize=(320, int(320/self.ratio)), interpolation=cv2.INTER_CUBIC)
         image -= image.min()
         image /= image.max()
-        # print(image.max(), image.min())
-        # height, width, channel = image.shape
-        # bytesPerLine = 3 * width + 1
-        # qImg = QtGui.QImage(image.data, width, height, bytesPerLine, QtGui.QImage.Format_RGB888)
-        # img = Image.fromarray(image, mode='RGB')
-        # qImg = ImageQt.ImageQt(img)
-        # labelImage = QtWidgets.QLabel()
-        # self.labelImage.setPixmap(QtGui.QPixmap.fromImage(qImg))
-        # self.labelImage.adjustSize()
+
         plt.imsave('RayTracing.png', image)
-        # plt.imshow(image)
-        # self.vtkWidget.GetRenderWindow().AddRenderer(self.ren2)
-        # self.vtkWidget.GetRenderWindow().Render()
-        # window.update()
+        showImage()
 
 
 if __name__ == "__main__":
