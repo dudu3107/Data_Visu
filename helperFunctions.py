@@ -16,7 +16,6 @@ n2l = lambda n: list(n)
 def coordsScreen(screen_size, camera, ratio):
     screen = (-screen_size + camera[0], screen_size / ratio + camera[1],
               screen_size + camera[0], -screen_size / ratio + camera[1])
-    # print(camera, screen)
     return screen
 
 def normalize(vector):
@@ -66,8 +65,6 @@ def calcNormals(object, cellId, direction):
     normalsCalc.ComputePointNormalsOff()
     normalsCalc.ComputeCellNormalsOn()
     normalsCalc.SplittingOff()
-    # normalsCalc.FlipNormalsOff()
-    # normalsCalc.AutoOrientNormalsOn()
     normalsCalc.Update()
     normalsObject = normalsCalc.GetOutput().GetCellData().GetNormals()
     normal = l2n(normalsObject.GetTuple(cellId))
@@ -80,6 +77,7 @@ def calcNormals(object, cellId, direction):
     return normal
 
 def addLine(renderer, p1, p2, color=[0.0, 0.0, 1.0]):
+    "Function used only for debugging"
     line = vtkLineSource()
     line.SetPoint1(p1)
     line.SetPoint2(p2)
@@ -94,6 +92,7 @@ def addLine(renderer, p1, p2, color=[0.0, 0.0, 1.0]):
     renderer.AddActor(actor)
 
 def addPoint(renderer, p, radius=0.01, color=[0.0, 0.0, 0.0]):
+    "Function used only for debugging"
     point = vtkSphereSource()
     point.SetCenter(p)
     point.SetRadius(radius)

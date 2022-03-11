@@ -14,7 +14,7 @@ from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QDialog, QDialogButtonBox, QFrame, QSlider,
                              QPushButton, QLineEdit, QGridLayout, QHBoxLayout, QVBoxLayout, QLabel,
                              QMessageBox, QColorDialog)
-from PyQt5.QtGui import QIcon, QFont, QColor
+from PyQt5.QtGui import QIcon, QFont
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
 import sys
@@ -24,13 +24,6 @@ import cv2
 
 from helperFunctions import *
 
-# TODO: Assign material to objects  x
-# TODO: Show cut objects also  xx
-# TODO: Show generated image in another QDialog xx
-# TODO: Select background color in configurations tab
-# TODO: implement multiprocessing
-# TODO: Ask Benji if he found a solution to the rotation problem
-# TODO: Clean code x
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -54,13 +47,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.vtkWidget = QVTKRenderWindowInteractor()
         self.vtkWidget.GetRenderWindow().AddRenderer(self.ren)
 
-        self.iren = self.vtkWidget.GetRenderWindow().GetInteractor()
+        iren = self.vtkWidget.GetRenderWindow().GetInteractor()
         style = vtkInteractorStyleTrackballCamera()
-        self.iren.SetInteractorStyle(style)
+        iren.SetInteractorStyle(style)
 
-        self.vBoxLayout = QVBoxLayout()
-        self.pushButton = QPushButton(" Render \n raytracing")
-        self.pushButton.setFont(QFont('Times', 12))
+        vBoxLayout = QVBoxLayout()
+        pushButton = QPushButton(" Render \n raytracing")
+        pushButton.setFont(QFont('Times', 12))
         self.sliderx = QSlider(Qt.Horizontal)
         self.sliderx.setValue(50)
         self.slidery = QSlider(Qt.Horizontal)
@@ -79,26 +72,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         configButton = QPushButton()
         configButton.setIcon(QIcon('Configuration.png'))
 
-        self.vBoxLayout.addWidget(self.pushButton)
-        self.vBoxLayout.addWidget(QLabel("Move Light"))
-        self.vBoxLayout.addWidget(self.sliderx)
-        self.vBoxLayout.addWidget(self.slidery)
-        self.vBoxLayout.addWidget(self.sliderz)
-        self.vBoxLayout.addWidget(QLabel("Move Camera"))
-        self.vBoxLayout.addWidget(self.sliderCx)
-        self.vBoxLayout.addWidget(self.sliderCy)
-        self.vBoxLayout.addWidget(self.sliderCz)
-        self.vBoxLayout.addWidget(QLabel("Rotate Body"))
-        self.vBoxLayout.addWidget(self.textRotation)
-        self.vBoxLayout.addWidget(rotationButton)
-        self.vBoxLayout.addWidget(configButton)
+        vBoxLayout.addWidget(pushButton)
+        vBoxLayout.addWidget(QLabel("Move Light"))
+        vBoxLayout.addWidget(self.sliderx)
+        vBoxLayout.addWidget(self.slidery)
+        vBoxLayout.addWidget(self.sliderz)
+        vBoxLayout.addWidget(QLabel("Move Camera"))
+        vBoxLayout.addWidget(self.sliderCx)
+        vBoxLayout.addWidget(self.sliderCy)
+        vBoxLayout.addWidget(self.sliderCz)
+        vBoxLayout.addWidget(QLabel("Rotate Body"))
+        vBoxLayout.addWidget(self.textRotation)
+        vBoxLayout.addWidget(rotationButton)
+        vBoxLayout.addWidget(configButton)
 
-        self.hBoxLayout = QHBoxLayout()
-        self.hBoxLayout.addWidget(self.vtkWidget)
-        self.hBoxLayout.addLayout(self.vBoxLayout)
-        self.hBoxLayout.setStretch(0, 1)
+        hBoxLayout = QHBoxLayout()
+        hBoxLayout.addWidget(self.vtkWidget)
+        hBoxLayout.addLayout(vBoxLayout)
+        hBoxLayout.setStretch(0, 1)
 
-        self.pushButton.clicked.connect(self.rayTrancingRender)
+        pushButton.clicked.connect(self.rayTrancingRender)
         self.sliderx.valueChanged.connect(self.moveAgentx)
         self.slidery.valueChanged.connect(self.moveAgenty)
         self.sliderz.valueChanged.connect(self.moveAgentz)
@@ -108,13 +101,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         rotationButton.clicked.connect(self.rotateBody)
         configButton.clicked.connect(self.showConfigWindow)
         
-        self.frame.setLayout(self.hBoxLayout)
+        self.frame.setLayout(hBoxLayout)
         self.setCentralWidget(self.frame)
 
         self.vtkWidget.GetRenderWindow().Render()
         self.show()
-        self.iren.Initialize()
-        self.iren.Start()
+        iren.Initialize()
+        iren.Start()
     
     def showConfigWindow(self):
         def getColor():
@@ -177,13 +170,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.colors.SetColor("ivory_black", *bkg)
         self.backgroundColor = list(self.colors.GetColor3d("ivory_black"))
 
-        self._createCamera()
-        self._addActors()
+        self.createCamera()
+        self.addActors()
 
         self.ren.ResetCamera()
         self.ren.GetActiveCamera().Zoom(0.7)
     
-    def _createCamera(self):
+    def createCamera(self):
         self.width = 100
         self.height = 100
         self.max_depth = 2
@@ -224,7 +217,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.ren.AddActor(self.screenActor)
 
-    def _addActors(self):
+    def addActors(self):
         configs = [ {"image_file": "Logo_HPC_AI.jpg", "cutPlane": [0.6, 0, 0], "angle": 0},
                     {"image_file": "cloud.jpg", "cutPlane": [-0.6, 0, 0], "angle": 90},
                     {"image_file": "hand-7014643_1920.jpg", "cutPlane": [0, 0, 0.6], "angle": 180},
@@ -360,19 +353,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         cubeRefActor.GetProperty().SetSpecularColor([1, 1, 1])
         self.actors.append(cubeRefActor)
 
-        self._createSunActor()
+        self.createSunActor()
 
         self.ren.AddActor(outlineActor)
         self.ren.AddActor(mainCubeActor)
         self.ren.AddActor(clippedImageActor)
         self.ren.AddActor(self.sunActor)
-        self.ren.SetBackground(self.backgroundColor) # "BkgColor"
+        self.ren.SetBackground(self.backgroundColor)
 
         #   This adds light to the scene, but I preferred not to use it.
-        # self._createLight()
+        # self.createLight()
         # self.ren.AddLight(self.light)
 
-    def _createSunActor(self):
+    def createSunActor(self):
         ResolutionSun = 10
         sun = vtkSphereSource()
         sun.SetCenter(0.0, 2.7, 1.4)
@@ -387,7 +380,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.sunActor.GetProperty().SetColor([1.0, 1.0, 0.0]) 
 
     
-    def _createLight(self):
+    def createLight(self):
         self.light = vtkLight()
         self.light.SetAmbientColor([1.0, 1.0, 0.0])
         self.light.SetConeAngle(180)
@@ -476,15 +469,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 min_distance = distance
                 nearest_object = objects[index]
                 cellId = cellIds[index]
-                self.nbl += 1
 
         return nearest_object, min_distance, cellId
 
 
     def rayTrancingRender(self):
-        self.bl = 0
-        self.nbl = 0
-
         obbs = getObbs(self.objects)
 
         image = np.zeros((self.height, self.width, 3))
@@ -510,13 +499,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     # addLine(self.ren, origin, intersection, color=[0.0, 0.0, 1.0])
                     normal_to_surface = calcNormals(nearest_object, cellId, direction)
 
-                    # if nearest_object == self.cubeRef:  # It's an interior surface
-                    #     normal_to_surface = - normal_to_surface
                     
                     shifted_point = intersection + 1e-5 * normal_to_surface
                     addPoint(self.ren, shifted_point, radius=0.05, color=[0.0, 0.0, 0.0])
                     intersection_to_light = normalize(l2n(self.sunActor.GetCenter()) - shifted_point)
-                    # print(min_distance, intersection_to_light_distance)
 
                     _, min_distance, _ = self.nearest_intersected_object(self.objects, obbs,
                                                             shifted_point, intersection_to_light)
@@ -524,10 +510,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     intersection_to_light_distance = np.linalg.norm(
                                                 l2n(self.sunActor.GetCenter()) - intersection)
                     is_shadowed = min_distance < intersection_to_light_distance
-                    # print(is_shadowed, min_distance, intersection_to_light_distance)
 
                     if is_shadowed:
-                        self.bl+=1
                         break
                     
                     illumination = np.zeros((3))
@@ -559,9 +543,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     direction = reflected(direction, normal_to_surface)
 
                 image[i, j] = np.clip(color, 0, 1)
-     
-        print("black", self.bl)
-        print("not black", self.nbl)
 
         image = cv2.resize(image, dsize=(320, int(320/self.ratio)), interpolation=cv2.INTER_CUBIC)
         image -= image.min()
