@@ -13,7 +13,7 @@ from vtkmodules.vtkRenderingCore import (vtkActor, vtkPolyDataMapper, vtkDataSet
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QDialog, QDialogButtonBox, QFrame, QSlider,
                              QPushButton, QLineEdit, QGridLayout, QHBoxLayout, QVBoxLayout, QLabel,
-                             QMessageBox, QColorDialog)
+                             QMessageBox, QColorDialog, QCheckBox)
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
@@ -117,11 +117,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.ren.SetBackground(self.backgroundColor)
                 self.vtkWidget.GetRenderWindow().Render()
 
-        def saveConfigs(width_text, height_text, depth_text):
+        def saveConfigs(width_text, height_text, depth_text, previewCheck):
             if width_text.text() and height_text.text() and depth_text.text():
                 self.width = int(width_text.text())
                 self.height = int(height_text.text())
                 self.max_depth = int(depth_text.text())
+                self.preview = True if previewCheck.isChecked() else False
                 
             else:
                 msgBox = QMessageBox()
@@ -131,6 +132,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 msgBox.exec_()
 
         win = QDialog()
+        win.resize(300, 250)
         win.setWindowTitle("Configurations")
         win.setWindowIcon(QIcon('configuration.png'))
 
@@ -140,6 +142,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         label2 = QLabel("Number of reflexions")
         depth_text = QLineEdit(f"{self.max_depth}")
         colorButton = QPushButton(" Background \n  color")
+        label3 = QLabel("Only preview")
+        previewCheck = QCheckBox()
 
         buttonBox = QDialogButtonBox(QDialogButtonBox.Ok, QtCore.Qt.Horizontal)
 
@@ -149,12 +153,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         layout.addWidget(height_text, 1, 1)
         layout.addWidget(label2, 2, 0)
         layout.addWidget(depth_text, 3, 0)
-        layout.addWidget(colorButton, 2, 1, 2, 1)
-        layout.addWidget(buttonBox, 4, 1)
+        layout.addWidget(colorButton, 2, 1, 3, 1)
+        layout.addWidget(label3, 4, 0)
+        layout.addWidget(previewCheck, 4, 0, Qt.AlignRight)
+        layout.addWidget(buttonBox, 5, 1)
 
         colorButton.clicked.connect(getColor)
         buttonBox.accepted.connect(win.accept)
-        buttonBox.accepted.connect(lambda: saveConfigs(width_text, height_text, depth_text))
+        buttonBox.accepted.connect(
+            lambda: saveConfigs(width_text, height_text, depth_text, previewCheck))
 
         win.setLayout(layout)
         win.exec_()
@@ -165,6 +172,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.mainActors = []
         self.objects = []
         self.actors = []
+        self.preview = False
         
         bkg = map(lambda x: x / 255.0, [26, 51, 102, 255])
         self.colors.SetColor("ivory_black", *bkg)
@@ -456,7 +464,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 distance = np.linalg.norm(l2n(firstPoint) - origin)
                 distances.append(distance)
                 cellIds.append(cellId)
-                # addLine(self.ren, origin, firstPoint)
+                if self.preview:
+                    addLine(self.ren, origin, firstPoint)
             else:
                 distances.append(None)
                 cellIds.append(None)
@@ -501,7 +510,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                     
                     shifted_point = intersection + 1e-5 * normal_to_surface
-                    addPoint(self.ren, shifted_point, radius=0.05, color=[0.0, 0.0, 0.0])
+
+                    if self.preview:
+                        addPoint(self.ren, shifted_point, radius=0.05, color=[0.0, 0.0, 0.0])
+
                     intersection_to_light = normalize(l2n(self.sunActor.GetCenter()) - shifted_point)
 
                     _, min_distance, _ = self.nearest_intersected_object(self.objects, obbs,
@@ -544,12 +556,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                 image[i, j] = np.clip(color, 0, 1)
 
-        image = cv2.resize(image, dsize=(320, int(320/self.ratio)), interpolation=cv2.INTER_CUBIC)
-        image -= image.min()
-        image /= image.max()
+        if self.preview:
+            self.vtkWidget.GetRenderWindow().Render()
+        else:
+            image = cv2.resize(image, dsize=(320, int(320/self.ratio)), interpolation=cv2.INTER_CUBIC)
+            image -= image.min()
+            image /= image.max()
 
-        plt.imsave('RayTracing.png', image)
-        showImage()
+            plt.imsave('RayTracing.png', image)
+            showImage()
 
 
 if __name__ == "__main__":
