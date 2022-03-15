@@ -10,4 +10,4 @@ rendered image.
 Below, we have an example of the image generated the application using the
 raytracing:
 
-![Raytracing Image(RayTracingReflex_Final2.png)
+![Raytracing Image](RayTracingReflex_Final2.png)
